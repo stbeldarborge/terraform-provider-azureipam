@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/XtratusCloud/azureipam",
+		Address: "registry.terraform.io/stbeldarborge/azureipam",
 		Debug:   debug,
 	} 
 
