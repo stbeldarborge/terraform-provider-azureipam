@@ -58,14 +58,14 @@ func (d *reservationsDataSource) Metadata(_ context.Context, req datasource.Meta
 // Schema defines the schema for the data source.
 func (d *reservationsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "The reservations data source allows you to retrieve information about all existing reservations in the specified space and blocks.",
+		Description: "The reservations data source allows you to retrieve information about all existing reservations in the specified space and block.",
 		Attributes: map[string]schema.Attribute{
 			"space": schema.StringAttribute{
 				Description: "Name of the existing space in the IPAM application.",
 				Required:    true,
 			},
 			"blocks": schema.ListAttribute{
-				Description: "List of existing blocks, related to the specified space.",
+				Description: "List of existing block names, related to the specified space, to search for reservations.",
 				Required:    true,
 				ElementType: types.StringType,
 			},
@@ -131,44 +131,54 @@ func (d *reservationsDataSource) Read(ctx context.Context, req datasource.ReadRe
 	// Read Terraform configuration state into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 
+	// Convert blocks list to []string
 	var blocks []string
-	diags := state.Blocks.ElementsAs(ctx, &blocks, false)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if diags := state.Blocks.ElementsAs(ctx, &blocks, false); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
 		return
 	}
-
-	reservations, err := d.client.GetReservations(state.Space.ValueString(), blocks[0], state.IncludeSettled.ValueBool())
-	if err != nil {
+	if len(blocks) == 0 {
 		resp.Diagnostics.AddError(
-			"Unable to Read AzureIpam Reservations",
-			err.Error(),
+			"Invalid Configuration",
+			"At least one block must be specified in 'blocks'.",
 		)
 		return
 	}
 
-	// Map response body to model
-	for _, reservation := range *reservations {
-		var reservationState reservationsModel
-		reservationState.Id = types.StringValue(reservation.Id)
-		reservationState.Cidr = types.StringValue(reservation.Cidr)
-		reservationState.Description = types.StringValue(reservation.Description)
-		reservationState.CreatedOn = timetypes.NewRFC3339TimeValue(time.Unix(int64(reservation.CreatedOn), 0))
-		reservationState.CreatedBy = types.StringValue(reservation.CreatedBy)
-		if reservation.SettledOn == nil {
-			reservationState.SettledOn = timetypes.NewRFC3339Null()
-		} else {
-			reservationState.SettledOn = timetypes.NewRFC3339TimeValue(time.Unix(int64(*reservation.SettledOn), 0))
+	// Gather reservations across all requested blocks
+	for _, block := range blocks {
+		reservations, err := d.client.GetReservations(state.Space.ValueString(), block, state.IncludeSettled.ValueBool())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to Read AzureIpam Reservations",
+				fmt.Sprintf("space=%s block=%s error=%s", state.Space.ValueString(), block, err.Error()),
+			)
+			return
 		}
-		if reservation.SettledBy == nil {
-			reservationState.SettledBy = types.StringNull()
-		} else {
-			reservationState.SettledBy = types.StringValue(*reservation.SettledBy)
-		}
-		reservationState.Status = types.StringValue(reservation.Status)
-		reservationState.Tags, _ = types.MapValueFrom(ctx, types.StringType, reservation.Tags)
 
-		state.Reservations = append(state.Reservations, reservationState)
+		// Map response body to model
+		for _, reservation := range *reservations {
+			var reservationState reservationsModel
+			reservationState.Id = types.StringValue(reservation.Id)
+			reservationState.Cidr = types.StringValue(reservation.Cidr)
+			reservationState.Description = types.StringValue(reservation.Description)
+			reservationState.CreatedOn = timetypes.NewRFC3339TimeValue(time.Unix(int64(reservation.CreatedOn), 0))
+			reservationState.CreatedBy = types.StringValue(reservation.CreatedBy)
+			if reservation.SettledOn == nil {
+				reservationState.SettledOn = timetypes.NewRFC3339Null()
+			} else {
+				reservationState.SettledOn = timetypes.NewRFC3339TimeValue(time.Unix(int64(*reservation.SettledOn), 0))
+			}
+			if reservation.SettledBy == nil {
+				reservationState.SettledBy = types.StringNull()
+			} else {
+				reservationState.SettledBy = types.StringValue(*reservation.SettledBy)
+			}
+			reservationState.Status = types.StringValue(reservation.Status)
+			reservationState.Tags, _ = types.MapValueFrom(ctx, types.StringType, reservation.Tags)
+
+			state.Reservations = append(state.Reservations, reservationState)
+		}
 	}
 
 	// Set state
