@@ -32,7 +32,7 @@ type reservationsDataSource struct {
 // reservationsDataSourceModel maps the data source schema data.
 type reservationsDataSourceModel struct {
 	Space          types.String        `tfsdk:"space"`
-	Blocks        types.List          `tfsdk:"blocks"`
+	Blocks         types.List          `tfsdk:"blocks"`
 	IncludeSettled types.Bool          `tfsdk:"include_settled"`
 	Reservations   []reservationsModel `tfsdk:"reservations"`
 }
@@ -131,7 +131,14 @@ func (d *reservationsDataSource) Read(ctx context.Context, req datasource.ReadRe
 	// Read Terraform configuration state into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 
-	reservations, err := d.client.GetReservations(state.Space.ValueString(), state.Blocks.ValueString(), state.IncludeSettled.ValueBool())
+	var blocks []string
+	diags := state.Blocks.ElementsAs(ctx, &blocks, false)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	reservations, err := d.client.GetReservations(state.Space.ValueString(), blocks[0], state.IncludeSettled.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Read AzureIpam Reservations",
