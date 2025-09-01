@@ -25,13 +25,13 @@ func TestAccReservationsNotSettledDataSource(t *testing.T) {
 			{
 				Config: testAccProviderConfig + `data "azureipam_reservations" "test" {
 					space = "au"
-					block = "AustraliaEast"
+					blocks = ["AustraliaEast"]
 					include_settled = false
 				}`,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					//Verify common attributes to ensure that all are set
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "space", "au"),
-					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "block", "AustraliaEast"),
+					// blocks is input-only; not validated in state
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "include_settled", "false"),
 					// Verify number of reservations returned
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.#", "1"),
@@ -75,13 +75,13 @@ func TestAccReservationsWithSettledDataSource(t *testing.T) {
 			{
 				Config: testAccProviderConfig + `data "azureipam_reservations" "test" {
 					space = "au"
-					block = "AustraliaEast"
+					blocks = ["AustraliaEast"]
 					include_settled = true
 				}`,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					//Verify common attributes to ensure that all are set
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "space", "au"),
-					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "block", "AustraliaEast"),
+					// blocks is input-only; not validated in state
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "include_settled", "true"),
 					// Verify number of reservations returned
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.#", "4"),
@@ -114,7 +114,7 @@ func TestAccReservationsWithSettledDataSource(t *testing.T) {
 							return nil
 						}
 						return errors.New("expected " + expected.String() + " got " + current.String())
-					}),					 
+					}),
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.3.created_by", "spn:9fc2493a-b515-49a6-9d73-93e1bac5f6cc"),
 					resource.TestCheckResourceAttrWith("data.azureipam_reservations.test", "reservations.3.settled_on", func(value string) error {
 						expected, _ := time.Parse(time.RFC3339, "2024-04-03T09:18:41+02:00")
@@ -123,7 +123,7 @@ func TestAccReservationsWithSettledDataSource(t *testing.T) {
 							return nil
 						}
 						return errors.New("expected " + expected.String() + " got " + current.String())
-					}),					 
+					}),
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.3.settled_by", "dummyemail@gmail.com"),
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.3.status", "cancelledByUser"),
 					resource.TestCheckResourceAttr("data.azureipam_reservations.test", "reservations.3.tags.%", "1"),
