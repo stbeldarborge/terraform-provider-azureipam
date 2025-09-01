@@ -131,7 +131,7 @@ func (d *reservationsDataSource) Read(ctx context.Context, req datasource.ReadRe
 	// Read Terraform configuration state into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 
-	reservations, err := d.client.GetReservations(state.Space.ValueString(), state.Blocks.ValueStringSlice(), state.IncludeSettled.ValueBool())
+	reservations, err := d.client.GetReservations(state.Space.ValueString(), state.Blocks.ValueString(), state.IncludeSettled.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Read AzureIpam Reservations",
