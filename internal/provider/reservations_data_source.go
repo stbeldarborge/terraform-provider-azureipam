@@ -32,7 +32,7 @@ type reservationsDataSource struct {
 // reservationsDataSourceModel maps the data source schema data.
 type reservationsDataSourceModel struct {
 	Space          types.String        `tfsdk:"space"`
-	Block          types.String        `tfsdk:"block"`
+	Blocks        types.List          `tfsdk:"blocks"`
 	IncludeSettled types.Bool          `tfsdk:"include_settled"`
 	Reservations   []reservationsModel `tfsdk:"reservations"`
 }
@@ -58,15 +58,16 @@ func (d *reservationsDataSource) Metadata(_ context.Context, req datasource.Meta
 // Schema defines the schema for the data source.
 func (d *reservationsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "The reservations data source allows you to retrieve information about all existing reservations in the specified space and block.",
+		Description: "The reservations data source allows you to retrieve information about all existing reservations in the specified space and blocks.",
 		Attributes: map[string]schema.Attribute{
 			"space": schema.StringAttribute{
 				Description: "Name of the existing space in the IPAM application.",
 				Required:    true,
 			},
-			"block": schema.StringAttribute{
-				Description: "Name of the existing block, related to the specified space.",
+			"blocks": schema.ListAttribute{
+				Description: "List of existing blocks, related to the specified space.",
 				Required:    true,
+				ElementType: types.StringType,
 			},
 			"include_settled": schema.BoolAttribute{
 				Description: "Settled reservations must be also included? Defaults to `false`.",
@@ -130,7 +131,7 @@ func (d *reservationsDataSource) Read(ctx context.Context, req datasource.ReadRe
 	// Read Terraform configuration state into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 
-	reservations, err := d.client.GetReservations(state.Space.ValueString(), state.Block.ValueString(), state.IncludeSettled.ValueBool())
+	reservations, err := d.client.GetReservations(state.Space.ValueString(), state.Blocks.ValueStringSlice(), state.IncludeSettled.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Read AzureIpam Reservations",
